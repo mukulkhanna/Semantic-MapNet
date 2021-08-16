@@ -19,7 +19,7 @@ from utils import convert_weights_cuda_cpu
 
 
 output_dir = 'data/test_data/features/'
-
+os.makedirs(output_dir, exist_ok=True)
 
 device = torch.device('cuda')
 
@@ -59,7 +59,7 @@ test_envs = envs_splits['test_envs']
 test_envs = [x for x in test_envs if x in paths]
 test_envs.sort()
 
-for env in test_envs:
+for env in tqdm(test_envs):
 
     if os.path.isfile(os.path.join(output_dir, env+'.h5')): continue
 

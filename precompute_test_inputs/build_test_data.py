@@ -16,6 +16,7 @@ from scipy.spatial.transform import Rotation as R
 
 
 output_dir = 'data/test_data/projections/'
+os.makedirs(output_dir)
 
 device = torch.device('cuda')
 
@@ -36,7 +37,7 @@ test_envs = envs_splits['test_envs']
 test_envs = [x for x in test_envs if x in paths]
 test_envs.sort()
 
-for env in test_envs:
+for env in tqdm(test_envs):
 
     # -- instantiate Habitat
     house, level = env.split('_')
