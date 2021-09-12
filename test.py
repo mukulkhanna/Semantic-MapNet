@@ -4,14 +4,29 @@ import h5py
 import torch
 import numpy as np
 
+from tqdm import tqdm
+
 from SMNet.model_test import SMNet
 
 from utils import convert_weights_cuda_cpu
-
+os.environ['CUDA_LAUNCH_BLOCKING'] = '1'
 split = 'test'
 
-data_dir = 'data/test_data/'
-output_dir = 'data/outputs/semmap/'
+data_dir = 'data/test_data/' # gt test data
+# data_dir = 'data/test_data_n_0.5/'
+# data_dir = 'data/test_vince_data/'
+# data_dir = 'data/test_data_n_1.0/'
+
+# output_dir = 'data/be_yes_mask_b4_loss/semmap/'
+# output_dir = 'data/be_no_mask_b4_loss/semmap/'
+# output_dir = 'data/my_gt_outputs/semmap/'
+output_dir = 'data/vince_best_outputs_check/semmap/'
+# output_dir = 'data/noisy_on_gt_outputs/semmap/'
+# output_dir = 'data/gt_on_noisy_outputs/semmap/'
+# output_dir = 'data/noisy_0.5_outputs/semmap/'
+# output_dir = 'data/vince_data_outputs/semmap/'
+# output_dir = 'data/noisy_1.0_outputs/semmap/'
+os.makedirs(output_dir, exist_ok=True)
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
@@ -27,6 +42,11 @@ cfg_model = {
     'ego_downsample': False,
 }
 model_path = 'smnet_mp3d_best_model.pkl'
+# model_path = 'runs/gru_fullrez_lastlayer_m256/93288/smnet_mp3d_best_model.pkl' # my gt loc model
+# model_path = 'runs/gru_fullrez_lastlayer_m256/yes-mask-b4-loss/smnet_mp3d_best_model.pkl' # my gt loc model
+# model_path = 'runs/gru_fullrez_lastlayer_m256/smnet-gt/smnet_mp3d_best_model.pkl' # noisy loc model
+# model_path = 'runs/gru_fullrez_lastlayer_m256/smnet-noisy-0.5/smnet_mp3d_best_model.pkl' # noisy loc model
+# model_path = 'runs/gru_fullrez_lastlayer_m256/smnet-noisy-1.0/smnet_mp3d_best_model.pkl'
 model = SMNet(cfg_model, device)
 model = model.to(device)
 
@@ -49,7 +69,7 @@ envs.sort()
 
 
 with torch.no_grad():
-    for env in envs:
+    for env in tqdm(envs):
 
         if os.path.isfile(os.path.join(output_dir, env+'.h5')): continue
 
@@ -85,9 +105,19 @@ with torch.no_grad():
 
         semmap = scores.data.max(0)[1]
         semmap = semmap.cpu().numpy()
+        
+        # values, counts = np.unique(semmap, return_counts=True)
+
+        # ind = np.argmax(counts)
+        # print('--------------')
+        # print(values[ind])
+        # print('--------------')
+
         semmap = semmap.astype(np.uint8)
         scores = scores.cpu().numpy()
         observed_map = observed_map.cpu().numpy()
+
+        # semmap [~observed_map] = 0
         height_map = height_map.cpu().numpy()
 
 

@@ -15,7 +15,10 @@ from utils.habitat_utils import HabitatUtils
 from scipy.spatial.transform import Rotation as R
 
 
-output_dir = 'data/test_data/projections/'
+NAME = 'test_data_n_0.5'
+# NAME = 'test_data_n_1.0'
+
+output_dir = f'data/{NAME}/projections/'
 os.makedirs(output_dir, exist_ok=True)
 
 device = torch.device('cuda')
@@ -26,6 +29,10 @@ default_ego_dim = (480, 640) #egocentric resolution
 z_clip = 0.50 # detections over z_clip will be ignored
 vfov = 67.5
 vfov = vfov * np.pi / 180.0
+
+noise = True
+noise_mul = 0.5
+# noise_mul = 1.0
 
 # -- -- Load json
 paths = json.load(open('data/paths.json', 'r'))
@@ -42,7 +49,7 @@ for env in tqdm(test_envs):
     # -- instantiate Habitat
     house, level = env.split('_')
     scene = 'data/mp3d/{}/{}.glb'.format(house, house)
-    habitat = HabitatUtils(scene, int(level))
+    habitat = HabitatUtils(scene, int(level), noise=noise, noise_mul=noise_mul)
 
     # -- get house info
     world_dim_discret = info[env]['dim']
@@ -74,12 +81,27 @@ for env in tqdm(test_envs):
             pos = path['positions'][n]
             ori = path['orientations'][n]
 
-            habitat.position = list(pos)
-            habitat.rotation = list(ori)
-            habitat.set_agent_state()
+            if n == 0 or not noise:
+                habitat.position = list(pos)
+                habitat.rotation = list(ori)
+                habitat.set_agent_state()
 
-            sensor_pos = habitat.get_sensor_pos()
-            sensor_ori = habitat.get_sensor_ori()
+                sensor_pos = habitat.get_sensor_pos()
+                sensor_ori = habitat.get_sensor_ori()
+
+            else:
+                action = path['actions'][n-1]
+                noisy_action = habitat.noisy_action_id_map[action]
+
+                habitat.step(noisy_action)
+
+                sensor_pos = habitat.get_sensor_pos()
+                sensor_ori = habitat.get_sensor_ori()
+
+                # repositioning agent to GT for correct observations 
+                habitat.position = list(pos)
+                habitat.rotation = list(ori)
+                habitat.set_agent_state()
 
             # -- get T transorm
             sensor_ori = np.array([sensor_ori.x, sensor_ori.y, sensor_ori.z, sensor_ori.w])

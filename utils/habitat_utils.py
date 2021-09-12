@@ -2,6 +2,7 @@ import json
 import habitat
 from habitat import get_config
 from habitat.sims import make_sim
+from habitat.sims.habitat_simulator.actions import HabitatSimActions
 from habitat.utils.visualizations import maps
 
 import numpy as np
@@ -9,16 +10,18 @@ import numpy as np
 from .semantic_utils import use_fine, object_whitelist
 from .semantic_utils import replica_to_mp3d_12cat_mapping
 
-
+from typing import Optional
 
 
 class HabitatUtils:
-    def __init__(self, scene, level, housetype='mp3d'):
+    def __init__(self, scene, level, housetype='mp3d', noise:Optional[bool]=False, noise_mul:Optional[float]=0.5):
         # -- scene = data/mp3d/house/house.glb
         self.scene = scene
         self.level = level  # -- int
         self.house = scene.split('/')[-2]
         self.housetype = housetype
+        self.noise = noise
+        self.noise_mul = noise_mul
 
         #-- setup config
         self.config = get_config()
@@ -31,6 +34,18 @@ class HabitatUtils:
         # -- Original resolution
         self.config.SIMULATOR.FORWARD_STEP_SIZE = 0.1
         self.config.SIMULATOR.TURN_ANGLE = 9
+
+        if self.noise:
+            from . import noisy_controls
+
+            # np.random.seed(self.config.SEED)
+            print(f"Initialising LoCoBot noisy actutations (mutliplier: {self.noise_mul})")
+            self.config.SIMULATOR.ACTION_SPACE_CONFIG = "PyrobotNoisyActions"
+            self.config.SIMULATOR.ACT_NOISE_MODEL = habitat.Config()
+            self.config.SIMULATOR.ACT_NOISE_MODEL.ROBOT = "LoCoBot"
+            self.config.SIMULATOR.ACT_NOISE_MODEL.CONTROLLER = "ILQR"
+            self.config.SIMULATOR.ACT_NOISE_MODEL.NOISE_MULT = self.noise_mul
+
 
         # -- fine resolution setps
         #self.config.SIMULATOR.FORWARD_STEP_SIZE = 0.05
@@ -85,6 +100,14 @@ class HabitatUtils:
             pass
 
         self.all_objects = self.get_objects_in_house()
+
+    @property
+    def noisy_action_id_map(self): 
+        return {
+            0: HabitatSimActions.NOISY_MOVE_FORWARD,
+            1: HabitatSimActions.NOISY_TURN_LEFT,
+            2: HabitatSimActions.NOISY_TURN_RIGHT,
+        }
 
     @property
     def position(self):

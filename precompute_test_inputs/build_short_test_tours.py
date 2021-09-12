@@ -8,15 +8,15 @@ from torch_scatter import scatter_max
 
 from multiprocessing import Pool
 
-# NAME = 'noisy_training_0.5_same_tours'
-NAME = 'noisy_training_1.0_same_tours'
-
+NAME = 'training'
 input_dir = f'data/{NAME}/smnet_training_data/'
 
-output_name = 'smnet_training_data_maxHIndices' 
-output_root = f'data/{NAME}'
+output_name = 'smnet_test_data_maxHIndices' 
+# output_root = f'data/{NAME}'
+output_root = f'data/short_test_tours/'
 output_dir = os.path.join(output_root, 
                           output_name)
+# output_dir = f'data/{NAME}/smnet_training_data_maxHIndices'
 os.makedirs(output_dir, exist_ok=True)
 
 files = os.listdir(input_dir)
@@ -24,6 +24,13 @@ files = os.listdir(input_dir)
 device = torch.device('cpu')
 
 def get_projections_indices(file):
+
+    name = file.split('.')[0]
+    env = '_'.join(name.split('_')[:2])
+
+    if env not in envs_splits['test_envs']:
+        return
+
     h5file = h5py.File(os.path.join(f'data/{NAME}/smnet_training_data', file), 'r')
     point_clouds = np.array(h5file['projection_indices'])
     heights = point_clouds[:,:,:,1]
@@ -79,6 +86,7 @@ def get_projections_indices(file):
     
 
 print(' Start collapsing projections indices (Projecting the pixel with highest height in case of collision.)')
+envs_splits = json.load(open('data/envs_splits.json', 'r'))
 
 pool = Pool(40)
 res = pool.map(get_projections_indices, files) 
@@ -87,38 +95,38 @@ print(' -> Done')
 
 print('Build .h5 files for each splits')
 
-envs_splits = json.load(open('data/envs_splits.json', 'r'))
 
 files = os.listdir(output_dir)
 
-for split in ['train', 'val', 'test']:
-    projection_indices = []
-    projection_masks = []
-    projection_indices_envs = []
-    for file in tqdm(files):
-        name = file.split('.')[0]
-        env = '_'.join(name.split('_')[:2])
-        if env in envs_splits['{}_envs'.format(split)]:
-            h5file = h5py.File(os.path.join(output_dir, file))
-            indices = np.array(h5file['indices'])
-            indices = indices[np.newaxis, ...]
-            projection_indices.append(indices)
-            mask_outliers = np.array(h5file['masks_outliers'])
-            mask_outliers = mask_outliers[np.newaxis, ...]
-            projection_masks.append(mask_outliers)
-            projection_indices_envs.append(name)
-            h5file.close()
-    
-    projection_indices = np.concatenate(projection_indices, axis=0)
-    projection_masks = np.concatenate(projection_masks, axis=0)
-    with h5py.File(os.path.join(output_root, 
-                                output_name+'_{}.h5'.format(split)), 
-                   'w') as f:
-        f.create_dataset('indices', data=np.array(projection_indices), dtype=np.int32)
-        f.create_dataset('masks_outliers', data=projection_masks, dtype=np.bool)
- 
-    json.dump(projection_indices_envs, 
-              open(os.path.join(output_root,
-                                output_name+'_{}.json'.format(split)), 
-                   'w'))
+split = 'test'
+
+projection_indices = []
+projection_masks = []
+projection_indices_envs = []
+for file in tqdm(files):
+    name = file.split('.')[0]
+    env = '_'.join(name.split('_')[:2])
+    if env in envs_splits['{}_envs'.format(split)]:
+        h5file = h5py.File(os.path.join(output_dir, file))
+        indices = np.array(h5file['indices'])
+        indices = indices[np.newaxis, ...]
+        projection_indices.append(indices)
+        mask_outliers = np.array(h5file['masks_outliers'])
+        mask_outliers = mask_outliers[np.newaxis, ...]
+        projection_masks.append(mask_outliers)
+        projection_indices_envs.append(name)
+        h5file.close()
+
+projection_indices = np.concatenate(projection_indices, axis=0)
+projection_masks = np.concatenate(projection_masks, axis=0)
+with h5py.File(os.path.join(output_root, 
+                            output_name+'_{}.h5'.format(split)), 
+                'w') as f:
+    f.create_dataset('indices', data=np.array(projection_indices), dtype=np.int32)
+    f.create_dataset('masks_outliers', data=projection_masks, dtype=np.bool)
+
+json.dump(projection_indices_envs, 
+            open(os.path.join(output_root,
+                            output_name+'_{}.json'.format(split)), 
+                'w'))
 

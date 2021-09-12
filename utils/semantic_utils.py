@@ -44,9 +44,11 @@ def color_label(label):
     if torch.is_tensor(label):
         is_tensor = True
         label = label.clone().cpu().data.numpy()
-
-    colored_label = np.vectorize(lambda x: label_colours[int(x)])
-
+    try:
+        colored_label = np.vectorize(lambda x: label_colours[int(x)])
+    except Exception as e:
+        print(e)
+        return None
     colored = np.asarray(colored_label(label)).astype(np.float32)
     colored = colored.squeeze()
 

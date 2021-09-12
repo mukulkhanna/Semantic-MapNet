@@ -19,13 +19,16 @@ from utils import convert_weights_cuda_cpu
 from scipy.spatial.transform import Rotation as R
 import torchvision.transforms as transforms
 
-
 # -- settings
-output_dir = 'data/training/smnet_training_data/'
-short_tour_start_indices_json = '/srv/flash1/vcartillier3/SMNet/start_index_in_video_training_data.json'
+# NAME = 'noisy_training_0.5_same_tours'
+NAME = 'noisy_training_1.0_same_tours'
+noise = True
+noise_mul = 1.0
 
+output_dir = f'data/{NAME}/smnet_training_data/'
 os.makedirs(output_dir, exist_ok=True)
 
+short_tour_start_indices_json = '/srv/flash1/vcartillier3/SMNet/start_index_in_video_training_data.json'
 
 #Settings
 resolution = 0.02 # topdown resolution
@@ -41,6 +44,7 @@ nb_frames_per_sample = 20
 
 paths = json.load(open('data/paths.json', 'r'))
 short_tour_start_indices = json.load(open(short_tour_start_indices_json, 'r'))
+
 
 device = torch.device('cuda')
 
@@ -90,7 +94,11 @@ for env, path in tqdm(paths.items()):
 
     house, level = env.split('_')
     scene = 'data/mp3d/{}/{}.glb'.format(house, house)
-    habitat = HabitatUtils(scene, int(level))
+
+    if house == '2n8kARJN3HM': # some issue with env.glb file on disk
+        continue
+
+    habitat = HabitatUtils(scene, int(level), noise=noise, noise_mul=noise_mul)
 
     N = len(path['positions'])
 
@@ -100,7 +108,7 @@ for env, path in tqdm(paths.items()):
 
         # start = np.random.randint(0, high=N-nb_frames_per_sample)
         # choose fixed starting point for each short tour -- the ones that were first created
-        start = short_tour_start_indices[env][m]['start']
+        start = short_tour_start_indices[env][str(m)]['start']
 
         info[env][m] = {'start':start}
 
@@ -127,12 +135,26 @@ for env, path in tqdm(paths.items()):
                 pos = sub_path['positions'][n]
                 ori = sub_path['orientations'][n]
 
-                habitat.position = list(pos)
-                habitat.rotation = list(ori)
-                habitat.set_agent_state()
+                if n == 0 or not noise:
+                    habitat.position = list(pos)
+                    habitat.rotation = list(ori)
+                    habitat.set_agent_state()
 
-                sensor_pos = habitat.get_sensor_pos()
-                sensor_ori = habitat.get_sensor_ori()
+                    sensor_pos = habitat.get_sensor_pos()
+                    sensor_ori = habitat.get_sensor_ori()
+
+                else:
+                    action = sub_path['actions'][n-1]
+                    noisy_action = habitat.noisy_action_id_map[action]
+                    habitat.step(noisy_action)
+
+                    sensor_pos = habitat.get_sensor_pos()
+                    sensor_ori = habitat.get_sensor_ori()
+
+                    # repositioning agent to GT for correct observations 
+                    habitat.position = list(pos)
+                    habitat.rotation = list(ori)
+                    habitat.set_agent_state()
 
                 sensor_positions.append(sensor_pos)
                 sensor_rotations.append([sensor_ori.x, sensor_ori.y, sensor_ori.z, sensor_ori.w])
@@ -219,7 +241,7 @@ for env, path in tqdm(paths.items()):
 
     del habitat
 
-json.dump(info, open('data/training/info_training_data.json', 'w'))
+json.dump(info, open(f'data/{NAME}/info_training_data.json', 'w'))
 
 
 

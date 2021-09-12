@@ -111,6 +111,8 @@ class SMNet(nn.Module):
                 dim=0,
                 out = height_map,
             )
+            # scatter issue
+            highest_height_indices[highest_height_indices >= len(height)] = -1
 
             m = highest_height_indices >= 0
 

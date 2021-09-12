@@ -14,6 +14,9 @@ import torch.distributed as distrib
 from tensorboardX import SummaryWriter
 from torch.optim.lr_scheduler import LambdaLR
 from torch.utils.data import DistributedSampler
+import cv2
+from utils.semantic_utils import color_label
+
 
 
 from SMNet.loader import SMNetLoader
@@ -57,7 +60,7 @@ def train(rank, world_size, cfg):
 
 
     # Setup Dataloader
-    t_loader = SMNetLoader(cfg["data"], split=cfg['data']['train_split'])
+    t_loader = SMNetLoader(cfg["data"], split=cfg['data']['val_split'])
     v_loader = SMNetLoader(cfg['data'], split=cfg["data"]["val_split"])
     t_sampler = DistributedSampler(t_loader)
     v_sampler = DistributedSampler(v_loader, shuffle=False)
@@ -195,7 +198,22 @@ def train(rank, world_size, cfg):
 
                 optimizer.step()
 
-                semmap_pred = semmap_pred.permute(0,2,3,1)
+                # semmap_pred: N,K,H,W where N is batch size and K is number of classes (13)
+                ''' predicting most common semantic class
+
+                values, indices = semmap_pred.max(1)             
+                values, counts = np.unique(indices.detach().cpu().numpy(), return_counts=True)
+
+                ind = np.argmax(counts)
+                print(values[ind])
+                '''
+
+                semmap_pred = semmap_pred.permute(0,2,3,1) # N,H,W,K
+
+                # N,H,W,K = semmap_pred.shape
+
+                # masked_semmap_gt = semmap_gt.view(-1)
+                # masked_semmap_pred = semmap_pred.view(-1, K)
 
                 masked_semmap_gt = semmap_gt[observed_masks]
                 masked_semmap_pred = semmap_pred[observed_masks]
@@ -246,6 +264,7 @@ def train(rank, world_size, cfg):
 
         model.eval()
         with torch.no_grad():
+            ctr = 0
             for batch_val in valloader:
 
                 features, masks_inliers, proj_indices, semmap_gt, _ = batch_val
@@ -257,7 +276,20 @@ def train(rank, world_size, cfg):
                     loss_val = loss_fn(semmap_gt.to(device), semmap_pred, observed_masks)
 
                     semmap_pred = semmap_pred.permute(0,2,3,1)
+                    semmap_np = semmap_pred.detach().cpu().numpy()
+                    semmap_np = semmap_np.max(-1)[0]
+                    try:
+                        semmap_np = color_label(semmap_np).transpose(1,2,0)
+                        cv2.imwrite(f'epoch_{epoch}_semmap_{ctr}_pred.png', semmap_np)
+                    except:
+                        print("Oops")
+                    # print('semmap_np.shape', semmap_np.shape)
 
+                    semmap_np_gt = semmap_gt.detach().cpu().numpy()
+                    semmap_np_gt = color_label(semmap_np_gt).transpose(1,2,0)
+                    cv2.imwrite(f'epoch_{epoch}_semmap_{ctr}_gt.png', semmap_np_gt)
+
+                    ctr += 1
                     masked_semmap_gt = semmap_gt[observed_masks]
                     masked_semmap_pred =semmap_pred[observed_masks]
 
@@ -351,6 +383,13 @@ if __name__ == "__main__":
         default="SMNet/smnet.yml",
         help="Configuration file to use",
     )
+    parser.add_argument(
+        "--run-id",
+        nargs="?",
+        type=str,
+        default="",
+        help="Configuration file to use",
+    )
 
     args = parser.parse_args()
     with open(args.config) as fp:
@@ -358,7 +397,11 @@ if __name__ == "__main__":
 
     name_expe = cfg['name_experiment']
 
-    run_id = random.randint(1, 100000)
+    if args.run_id == "":
+        run_id = random.randint(1, 100000)
+    else:
+        run_id = args.run_id
+
     logdir = os.path.join("runs", name_expe, str(run_id))
     chkptdir = os.path.join("checkpoints", name_expe, str(run_id))
 
@@ -372,7 +415,7 @@ if __name__ == "__main__":
     print("CHECKPOINTDIR: {}".format(chkptdir))
     Path(chkptdir).mkdir(parents=True, exist_ok=True)
 
-    world_size=8
+    world_size=1
     mp.spawn(train,
              args=(world_size, cfg),
              nprocs=world_size,

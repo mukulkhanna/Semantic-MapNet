@@ -34,8 +34,15 @@ def crop_memories(memory, size):
 
     new_min_x = center_x - map_width/2
     new_max_x = center_x + map_width/2
-
-    new_min_x = int(np.round(new_min_x))
+    try:
+        new_min_x = int(np.round(new_min_x))
+    except Exception as e:
+        print('map.any()', map.any())
+        print('map.sum()', map.sum())
+        print('np.sum(map_x)', np.sum(map_x))
+        print('center_x', center_x)
+        print('new_min_x', new_min_x)
+        exit
     new_max_x = int(np.round(new_max_x))
     if new_max_x - new_min_x + 1 > map_width:
         new_max_x -= (new_max_x - new_min_x + 1) - map_width
