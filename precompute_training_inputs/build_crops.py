@@ -1,14 +1,13 @@
-import os
 import json
-import h5py
-import torch
-import numpy as np
-
+import os
 import sys
-BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-sys.path.append(os.path.join(BASE_DIR, '../'))
 
-from utils.crop_memories import crop_memories
+import h5py
+import numpy as np
+import torch
+
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+sys.path.append(os.path.join(BASE_DIR, "../"))
 
 from torch_scatter import scatter_add
 from tqdm import tqdm
@@ -27,12 +26,12 @@ sample_indices_output_dir = f'data/{NAME}/smnet_training_data_indices'
 os.makedirs(sample_indices_output_dir, exist_ok=True)
 os.makedirs(sample_semmap_output_dir, exist_ok=True)
 
-semmap_info = json.load(open('data/semmap_GT_info.json', 'r'))
+semmap_info = json.load(open("data/semmap_GT_info.json", "r"))
 
-#Settings
-resolution = 0.02 # topdown resolution
-default_ego_dim = (480, 640) #egocentric resolution
-z_clip = 0.50 # detections over z_clip will be ignored
+# Settings
+resolution = 0.02  # topdown resolution
+default_ego_dim = (480, 640)  # egocentric resolution
+z_clip = 0.50  # detections over z_clip will be ignored
 vfov = 67.5
 vfov = vfov * np.pi / 180.0
 
@@ -47,25 +46,24 @@ observed_masks = np.zeros((len(files), 250, 250), dtype=np.bool)
 semantic_maps_env_names = []
 for n, file in tqdm(enumerate(files), total=len(files)):
 
-    house, level, _ = file.split('_')
-    env = '_'.join((house, level))
+    house, level, _ = file.split("_")
+    env = "_".join((house, level))
 
-
-    map_world_shift = np.array(semmap_info[env]['map_world_shift'])
-    world_discret_dim = np.array(semmap_info[env]['dim'])
+    map_world_shift = np.array(semmap_info[env]["map_world_shift"])
+    world_discret_dim = np.array(semmap_info[env]["dim"])
     map_width = world_discret_dim[0]
     map_height = world_discret_dim[2]
 
-    h5file = h5py.File(os.path.join(semmap_dir, env + '.h5'), 'r')
-    semmap = np.array(h5file['map_semantic'], dtype=np.int)
-    insmap = np.array(h5file['map_instance'], dtype=np.int)
+    h5file = h5py.File(os.path.join(semmap_dir, env + ".h5"), "r")
+    semmap = np.array(h5file["map_semantic"], dtype=np.int)
+    insmap = np.array(h5file["map_instance"], dtype=np.int)
     h5file.close()
 
-    h5file = h5py.File(os.path.join(data_dir, file), 'r')
-    rgb = np.array(h5file['rgb'], dtype=np.uint8)
-    projection_indices = np.array(h5file['projection_indices'], dtype=np.float32)
-    masks_outliers = np.array(h5file['masks_outliers'], dtype=np.bool)
-    sensor_positions = np.array(h5file['sensor_positions'], dtype=np.float32)
+    h5file = h5py.File(os.path.join(data_dir, file), "r")
+    rgb = np.array(h5file["rgb"], dtype=np.uint8)
+    projection_indices = np.array(h5file["projection_indices"], dtype=np.float32)
+    masks_outliers = np.array(h5file["masks_outliers"], dtype=np.bool)
+    sensor_positions = np.array(h5file["sensor_positions"], dtype=np.float32)
     h5file.close()
 
     h5file = h5py.File(os.path.join(gt_data_dir, file), 'r')
@@ -91,10 +89,12 @@ for n, file in tqdm(enumerate(files), total=len(files)):
     pixels_in_map = (projection_indices[:,:,:, [0,2]] / resolution).round().long()
     gt_pixels_in_map = (gt_projection_indices[:,:,:, [0,2]] / resolution).round().long()
 
-    outside_map_indices = (pixels_in_map[:, :, :, 0] >= map_width) +\
-                          (pixels_in_map[:, :, :, 1] >= map_height) +\
-                          (pixels_in_map[:, :, :, 0] < 0) +\
-                          (pixels_in_map[:, :, :, 1] < 0)
+    outside_map_indices = (
+        (pixels_in_map[:, :, :, 0] >= map_width)
+        + (pixels_in_map[:, :, :, 1] >= map_height)
+        + (pixels_in_map[:, :, :, 0] < 0)
+        + (pixels_in_map[:, :, :, 1] < 0)
+    )
 
     gt_outside_map_indices = (gt_pixels_in_map[:, :, :, 0] >= map_width) +\
                           (gt_pixels_in_map[:, :, :, 1] >= map_height) +\
@@ -124,12 +124,9 @@ for n, file in tqdm(enumerate(files), total=len(files)):
     
     gt_flat_indices = map_width * gt_flat_pixels_in_map[:,1] + gt_flat_pixels_in_map[:,0]
     gt_flat_indices = gt_flat_indices.long()
-    
+
     ones = torch.ones(flat_indices.shape)
     gt_ones = torch.ones(gt_flat_indices.shape)
-
-    flat_map = torch.zeros((map_width * map_height))
-    gt_flat_map = torch.zeros((map_width * map_height))
 
     flat_map = scatter_add(
         ones,
@@ -153,37 +150,29 @@ for n, file in tqdm(enumerate(files), total=len(files)):
     mask = mask.cpu().numpy()
     gt_mask = gt_mask.cpu().numpy()
     
-    if mask.any():
-        mask_observe, dim = crop_memories(mask, (250,250))
-    else:
-        print(file)
-        continue
-
-    if gt_mask.any():
-        gt_mask_observe, gt_dim = crop_memories(gt_mask, (250,250))
-    else:
-        print(file)
-        continue
+    mask_observe, dim = crop_memories(mask, (250,250))
+    gt_mask_observe, gt_dim = crop_memories(gt_mask, (250,250))
 
     min_y, max_y, min_x, max_x = dim
     gt_min_y, gt_max_y, gt_min_x, gt_max_x = gt_dim
 
-    print(dim)
-    print(gt_dim)
+    # print(dim)
+    # print(gt_dim)
 
-    outside_sample_map_indices = (pixels_in_map[:, :, :, 0] >= max_x+1) +\
-                                 (pixels_in_map[:, :, :, 1] >= max_y+1) +\
-                                 (pixels_in_map[:, :, :, 0] < min_x) +\
-                                 (pixels_in_map[:, :, :, 1] < min_y)
+    outside_sample_map_indices = (
+        (pixels_in_map[:, :, :, 0] >= max_x + 1)
+        + (pixels_in_map[:, :, :, 1] >= max_y + 1)
+        + (pixels_in_map[:, :, :, 0] < min_x)
+        + (pixels_in_map[:, :, :, 1] < min_y)
+    )
 
     mask_outliers_sample = masks_outliers + outside_sample_map_indices
 
-    pixels_in_map[:,:,:,0] -= min_x
-    pixels_in_map[:,:,:,1] -= min_y
+    pixels_in_map[:, :, :, 0] -= min_x
+    pixels_in_map[:, :, :, 1] -= min_y
 
-
-    sample_semmap = semmap[min_y:max_y+1, min_x:max_x+1]
-    sample_insmap = insmap[min_y:max_y+1, min_x:max_x+1]
+    sample_semmap = semmap[min_y : max_y + 1, min_x : max_x + 1]
+    sample_insmap = insmap[min_y : max_y + 1, min_x : max_x + 1]
 
     # sample_semmap = semmap[gt_min_y:gt_max_y+1, gt_min_x:gt_max_x+1]
     # sample_insmap = insmap[gt_min_y:gt_max_y+1, gt_min_x:gt_max_x+1]
@@ -196,12 +185,11 @@ for n, file in tqdm(enumerate(files), total=len(files)):
         f.create_dataset('insmap', data=sample_insmap, dtype=np.int32)
 
     filename = os.path.join(sample_indices_output_dir, file)
-    with h5py.File(filename, 'w') as f:
-        f.create_dataset('masks_outliers', data=mask_outliers_sample, dtype=np.bool)
-        f.create_dataset('indices', data=pixels_in_map, dtype=np.int32)
+    with h5py.File(filename, "w") as f:
+        f.create_dataset("masks_outliers", data=mask_outliers_sample, dtype=np.bool)
+        f.create_dataset("indices", data=pixels_in_map, dtype=np.int32)
 
-
-    info[file]={'dim': [min_y, max_y, min_x, max_x]}
+    info[file] = {"dim": [min_y, max_y, min_x, max_x]}
 
     semantic_maps_env_names.append(file)
     semantic_maps[n,:,:] = sample_semmap
@@ -218,6 +206,3 @@ with h5py.File(f'data/{NAME}/smnet_training_data_semmap.h5', 'w') as f:
     f.create_dataset('semantic_maps', data=semantic_maps, dtype=np.int32)
     f.create_dataset('instance_maps', data=instance_maps, dtype=np.int32)
     f.create_dataset('observed_masks', data=observed_masks, dtype=np.bool)
-
-
-
