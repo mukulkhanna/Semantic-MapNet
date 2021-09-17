@@ -348,7 +348,7 @@ def train(rank, world_size, cfg):
                 "scheduler_state": scheduler.state_dict(),
                 "best_iou": best_iou,
             }
-            save_path = os.path.join(cfg["checkpoint_dir"], "ckpt_model.pkl")
+            save_path = os.path.join(cfg["checkpoint_dir"], f"e_{epoch}_ckpt_model.pkl")
             torch.save(state, save_path)
 
         val_loss_meter.reset()
@@ -367,6 +367,13 @@ if __name__ == "__main__":
         default="SMNet/smnet.yml",
         help="Configuration file to use",
     )
+    parser.add_argument(
+        "--run-id",
+        nargs="?",
+        type=str,
+        default="",
+        help="Configuration file to use",
+    )
 
     args = parser.parse_args()
     with open(args.config) as fp:
@@ -374,7 +381,11 @@ if __name__ == "__main__":
 
     name_expe = cfg["name_experiment"]
 
-    run_id = random.randint(1, 100000)
+    if args.run_id == "":
+        run_id = random.randint(1, 100000)
+    else:
+        run_id = args.run_id
+
     logdir = os.path.join("runs", name_expe, str(run_id))
     chkptdir = os.path.join("checkpoints", name_expe, str(run_id))
 
