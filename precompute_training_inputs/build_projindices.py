@@ -8,10 +8,12 @@ import torch
 from torch_scatter import scatter_max
 from tqdm import tqdm
 
-input_dir = "data/training/smnet_training_data/"
+DIR_NAME = "training"
+
+input_dir = f"data/{DIR_NAME}/smnet_training_data/"
 
 output_name = "smnet_training_data_maxHIndices"
-output_root = "data/training"
+output_root = f"data/{DIR_NAME}"
 output_dir = os.path.join(output_root, output_name)
 os.makedirs(output_dir, exist_ok=True)
 
@@ -21,13 +23,13 @@ device = torch.device("cpu")
 
 
 def get_projections_indices(file):
-    h5file = h5py.File(os.path.join("data/training/smnet_training_data", file), "r")
+    h5file = h5py.File(os.path.join(f"data/{DIR_NAME}/smnet_training_data", file), "r")
     point_clouds = np.array(h5file["projection_indices"])
     heights = point_clouds[:, :, :, 1]
     h5file.close()
 
     h5file = h5py.File(
-        os.path.join("data/training/smnet_training_data_indices", file), "r"
+        os.path.join(f"data/{DIR_NAME}/smnet_training_data_indices", file), "r"
     )
     proj_indices = np.array(h5file["indices"])
     masks_outliers = np.array(h5file["masks_outliers"])
@@ -91,7 +93,7 @@ envs_splits = json.load(open("data/envs_splits.json", "r"))
 
 files = os.listdir(output_dir)
 
-for split in ["train", "val"]:
+for split in ["train", "val", "test"]:
     projection_indices = []
     projection_masks = []
     projection_indices_envs = []
