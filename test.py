@@ -1,17 +1,55 @@
+import argparse
+import cv2
 import json
 import os
 
 import h5py
 import numpy as np
 import torch
+from tqdm import tqdm
 
 from SMNet.model_test import SMNet
 from utils import convert_weights_cuda_cpu
 
-split = "test"
+parser = argparse.ArgumentParser(description="config")
 
-data_dir = "data/test_data/"
-output_dir = "data/outputs/semmap/"
+parser.add_argument(
+    "--split",
+    type=str,
+    default='test',
+    help="Noise multiplier for noisy actuations.",
+)
+parser.add_argument(
+    "--test-data-dir",
+    "-i",
+    type=str,
+    default='data/test_data/gt_loc',
+    help="Path to folder containing full tour test data.",
+)
+parser.add_argument(
+    "--smnet-ckpt-path",
+    "-c",
+    type=str,
+    default='runs/custom_experiments/smnet-gt/smnet_mp3d_best_model.pkl',
+    help="Path to SMNet checkpoint.",
+)
+parser.add_argument(
+    "--output-data-dir",
+    "-o",
+    type=str,
+    default='data/test_outputs/gt_loc/',
+    help="Path where SMNet outputs from test data will be saved.",
+)
+args = parser.parse_args()
+
+# data_dir = "data/test_data/"
+# output_dir = "data/outputs/semmap/"
+# model_path = "smnet_mp3d_best_model.pkl"
+
+data_dir = args.test_data_dir
+output_dir = args.output_data_dir
+os.makedirs(output_dir, exist_ok=True)
+model_path = args.smnet_ckpt_path
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
@@ -26,12 +64,16 @@ cfg_model = {
     "mem_update": "gru",
     "ego_downsample": False,
 }
-model_path = "smnet_mp3d_best_model.pkl"
 model = SMNet(cfg_model, device)
 model = model.to(device)
 
+print('------------------------------------')
+print("Input test data path:", data_dir)
+print("Output semmap data path:", output_dir)
 print("Loading pre-trained weights: ", model_path)
 state = torch.load(model_path)
+print(f"Checkpoint loaded. Trained for {state['epoch']} epochs.")
+print('------------------------------------')
 model_state = state["model_state"]
 model_state = convert_weights_cuda_cpu(model_state, "cpu")
 model.load_state_dict(model_state)
@@ -42,13 +84,13 @@ model.eval()
 info = json.load(open("data/semmap_GT_info.json", "r"))
 paths = json.load(open("data/paths.json", "r"))
 envs_splits = json.load(open("data/envs_splits.json", "r"))
-envs = envs_splits["{}_envs".format(split)]
+envs = envs_splits["{}_envs".format(args.split)]
 envs = [x for x in envs if x in paths]
 envs.sort()
 
 
 with torch.no_grad():
-    for env in envs:
+    for env in tqdm(envs):
 
         if os.path.isfile(os.path.join(output_dir, env + ".h5")):
             continue

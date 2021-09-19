@@ -143,6 +143,8 @@ class SMNet(nn.Module):
                 out=height_map,
             )
 
+            # fix for difference in scatter versions
+            highest_height_indices[highest_height_indices >= len(height)] = -1
             m = highest_height_indices >= 0
 
             observed_masks += m
