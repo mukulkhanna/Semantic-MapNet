@@ -53,10 +53,16 @@ def train(rank, world_size, cfg):
     if rank == 0:
         writer = SummaryWriter(logdir=cfg["logdir"])
         logger = get_logger(cfg["logdir"])
+        logger.info(f"GPU: {torch.cuda.get_device_name(0)}")
         logger.info("Let SMNet training begin !!")
+        writer.add_text("logs", "Let SMNet training begin !!")
 
     # Setup Dataloader
-    t_loader = SMNetLoader(cfg["data"], split=cfg["data"]["train_split"])
+    t_loader = SMNetLoader(
+        cfg["data"],
+        split=cfg["data"]["train_split"],
+        gt_semmap_crops=cfg["data"]["gt_semmap_crops"],
+    )
     v_loader = SMNetLoader(cfg["data"], split=cfg["data"]["val_split"])
     t_sampler = DistributedSampler(t_loader)
     v_sampler = DistributedSampler(v_loader, shuffle=False)
@@ -64,6 +70,8 @@ def train(rank, world_size, cfg):
     if rank == 0:
         print("#Envs in train: %d" % (len(t_loader.files)))
         print("#Envs in val: %d" % (len(v_loader.files)))
+        writer.add_text("logs", f"#Envs in train: {len(t_loader.files)}")
+        writer.add_text("logs", f"#Envs in val: {len(v_loader.files)}")
 
     trainloader = data.DataLoader(
         t_loader,
@@ -122,7 +130,14 @@ def train(rank, world_size, cfg):
     time_meter = averageMeter()
 
     # setup Loss
-    loss_fn = SemmapLoss()
+    if "loss_weights" in cfg["training"].keys():
+        if cfg["training"]["loss_weights"] is not None:
+            loss_fn = SemmapLoss(weights=torch.Tensor(cfg["training"]["loss_weights"]))
+        else:
+            loss_fn = SemmapLoss()
+    else:
+        loss_fn = SemmapLoss()
+
     loss_fn = loss_fn.to(device=device)
 
     if rank == 0:
@@ -255,6 +270,7 @@ def train(rank, world_size, cfg):
 
                     print(print_str)
                     writer.add_scalar("loss/train_loss", loss.item(), iter)
+                    writer.add_text("train", print_str, iter)
                     time_meter.reset()
 
         model.eval()
@@ -338,6 +354,9 @@ def train(rank, world_size, cfg):
                     "{}_mp3d_best_model.pkl".format(cfg["model"]["arch"]),
                 )
                 torch.save(state, save_path)
+                writer.add_text(
+                    "val", f"Best val mIOU: {best_iou}; at epoch {epoch}", iter
+                )
 
             # -- save checkpoint after every epoch
             state = {

@@ -1,3 +1,4 @@
+import argparse
 import json
 import os
 import sys
@@ -6,28 +7,37 @@ import h5py
 import numpy as np
 from tqdm import tqdm
 
-sys.path.append("../metric/")
-from metric.iou import IoU
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+sys.path.append(os.path.join(BASE_DIR, "../"))
 
-sys.path.append("../utils/")
-from semantic_utils import object_whitelist
+from metric.iou import IoU
+from utils.semantic_utils import object_whitelist
+
+parser = argparse.ArgumentParser(description="config")
+
+parser.add_argument(
+    "--pred-output-dir",
+    "-d",
+    type=str,
+    default="data/test_outputs/gt_loc_vince/",
+    help="Path where SMNet outputs from test data are saved.",
+)
+args = parser.parse_args()
 
 split = "test"
-dataset = "replica"
+dataset = "mp3d"
 
 
 object_whitelist = ["void"] + object_whitelist
 
 if dataset == "mp3d":
-    GT_dir = "data/GT/semmap/"
+    GT_dir = "data/semmap/"
     obsmaps_dir = "data/observed_masks"
 elif dataset == "replica":
     GT_dir = "data/replica/semmap/"
     obsmaps_dir = "data/replica/observed_masks"
 
-# -- select prediction dir
-pred_dir = "data/replica/OUTPUTS/fullrez/SMNet_gru_lastlayer_m256/"
-
+print("Evaluating test outputs from: ", args.pred_output_dir)
 if dataset == "mp3d":
     paths = json.load(open("data/paths.json", "r"))
     envs_splits = json.load(open("data/envs_splits.json", "r"))
@@ -49,13 +59,14 @@ metrics.reset()
 
 total = 0
 
-filename = os.path.join(pred_dir, "evaluation_metrics.h5")
+filename = os.path.join(args.pred_output_dir, "evaluation_metrics.h5")
 with h5py.File(filename, "w") as f:
     for env in tqdm(envs):
 
         file = env + ".h5"
 
-        if not os.path.isfile(os.path.join(pred_dir, "semmap", file)):
+        if not os.path.isfile(os.path.join(args.pred_output_dir, file)):
+            print(f"skipping {file}")
             continue
 
         total += 1
@@ -64,17 +75,14 @@ with h5py.File(filename, "w") as f:
         gt_semmap = np.array(gt_h5_file["map_semantic"])
         gt_h5_file.close()
 
-        pred_h5_file = h5py.File(os.path.join(pred_dir, "semmap", file), "r")
+        pred_h5_file = h5py.File(os.path.join(args.pred_output_dir, file), "r")
         if "map_semantic" in pred_h5_file:
             pred_semmap = np.array(pred_h5_file["map_semantic"])
         else:
             pred_semmap = np.array(pred_h5_file["semmap"])
+            observed_map = np.array(pred_h5_file["observed_map"])
+            observed_map = observed_map.astype(np.bool)
         pred_h5_file.close()
-
-        h5file = h5py.File(os.path.join(obsmaps_dir, file), "r")
-        observed_map = np.array(h5file["observed_map"])
-        observed_map = observed_map.astype(np.bool)
-        h5file.close()
 
         obj_gt = gt_semmap[observed_map]
         obj_pred = pred_semmap[observed_map]

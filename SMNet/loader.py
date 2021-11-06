@@ -1,5 +1,6 @@
 import json
 import os
+from typing import Optional
 
 import h5py
 import numpy as np
@@ -12,7 +13,7 @@ envs_splits = json.load(open("data/envs_splits.json", "r"))
 
 
 class SMNetLoader(data.Dataset):
-    def __init__(self, cfg, split="train"):
+    def __init__(self, cfg, split="train", gt_semmap_crops: Optional[bool] = True):
 
         self.split = split
         self.root = cfg["root"]
@@ -32,7 +33,21 @@ class SMNetLoader(data.Dataset):
         h5file = h5py.File(
             os.path.join(self.root, "smnet_training_data_semmap.h5"), "r"
         )
-        self.semmap_GT = np.array(h5file["semantic_maps"])
+
+        if gt_semmap_crops:
+            print("[ Using GT semmap crops.")
+        else:
+            print(f"[ Using noisy semmap crops with {self.split} split.")
+
+        if gt_semmap_crops and "gt_semantic_maps" in h5file.keys():
+            print("from h5file ['gt_semantic_maps'] ]")
+            self.semmap_GT = np.array(
+                h5file["gt_semantic_maps"]
+            )  # SEMMAP CROPS WITHOUT NOISE
+        else:
+            print("from h5file ['semantic_maps'] ]")
+            self.semmap_GT = np.array(h5file["semantic_maps"])  # SEMMAPS WITH NOISE
+
         h5file.close()
         self.semmap_GT_envs = json.load(
             open(os.path.join(self.root, "smnet_training_data_semmap.json"), "r")
