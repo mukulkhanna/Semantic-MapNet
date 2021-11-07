@@ -3,9 +3,14 @@ from torch import nn
 
 
 class SemmapLoss(nn.Module):
-    def __init__(self):
+    def __init__(self, weights=None):
         super(SemmapLoss, self).__init__()
-        self.loss = nn.CrossEntropyLoss(reduction="none")
+        if weights is None:
+            self.loss = nn.CrossEntropyLoss(reduction="none")
+        else:
+            self.loss = nn.CrossEntropyLoss(weight=weights, reduction="none")
+            print("Using weights for CE loss.")
+        
 
     def forward(self, obj_gt, obj_pred, mask):
         mask = mask.float()
