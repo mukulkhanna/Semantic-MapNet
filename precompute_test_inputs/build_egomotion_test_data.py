@@ -32,11 +32,8 @@ sys.path.append(VO_DIR)
 
 from pointnav_vo.vo.common.base_vo_trainer import BaseVOTrainer as VO
 
-DIRNAME = f"test_data/egomotion_data_TMP_DEL"
-# DIRNAME = f"test_data/egomotion_data_1mil_barebones_unified"
-# DIRNAME = f"test_data/egomotion_data"
-VO_CONFIG = "/nethome/mkhanna38/disk/PointNav-VO/configs/vo_eval/vo_mp3d_100k_barebones_unified.yaml"
-# VO_CONFIG = '/nethome/mkhanna38/disk/PointNav-VO/configs/vo_eval/vo_mp3d_100k_barebones_action_conditioned.yaml'
+DIRNAME = f"test_data/egomotion_data"
+VO_CONFIG = '/nethome/mkhanna38/disk/PointNav-VO/configs/vo_eval/vo_mp3d_100k_barebones_action_conditioned.yaml'
 
 output_dir = f"data/{DIRNAME}/projections/"
 traj_viz_output_dir = f"data/{DIRNAME}/trajectory_viz/"
