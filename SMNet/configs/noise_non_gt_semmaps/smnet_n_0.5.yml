@@ -19,7 +19,6 @@ training:
     batch_size: 8
     n_workers: 2
     print_interval: 20
-    loss_weights: None
     optimizer:
         lr: 1.0e-4
         momentum: 0.9

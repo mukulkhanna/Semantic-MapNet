@@ -1,4 +1,4 @@
-name_experiment: non_gt_semmaps
+name_experiment: egomotion
 model:
     arch: smnet
     finetune: False
@@ -10,7 +10,7 @@ model:
 data:
     train_split: train
     val_split: val
-    root: data/training_noise_1.0/
+    root: data/training_egomotion/
     ego_downsample: False
     feature_type: lastlayer
     gt_semmap_crops: False
