@@ -24,7 +24,7 @@ mpcat40_to_12cat = {int(k): int(v) for k, v in mpcat40_to_12cat.items()}
 
 
 label_colours = [
-    (0, 0, 0),
+    (160, 160, 160),
     (106, 137, 204),  # shelving
     (230, 126, 34),  # chest of drawers
     (7, 153, 146),  # bed
